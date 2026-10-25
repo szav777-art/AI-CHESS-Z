@@ -26,7 +26,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
           ZIP_FILE="$(find . -maxdepth 5 -type f -iname 'AI-CHESS-Z_Android_Shell_OEX_0.7.zip' -print -quit)"
+
           if [ -z "$ZIP_FILE" ]; then
             echo "::error::Android project ZIP not found"
             find . -type f -iname '*.zip'
@@ -37,8 +39,10 @@ jobs:
           unzip -q "$ZIP_FILE" -d extracted
 
           PROJECT_DIR=""
+
           while IFS= read -r SETTINGS; do
             DIR="$(dirname "$SETTINGS")"
+
             if [ -f "$DIR/app/build.gradle" ] || [ -f "$DIR/app/build.gradle.kts" ]; then
               PROJECT_DIR="$DIR"
               break
@@ -64,16 +68,18 @@ jobs:
         uses: android-actions/setup-android@v3
 
       - name: Install Android SDK packages
+        shell: bash
         run: |
+          set -e
           yes | sdkmanager --licenses || true
-          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+          sdkmanager --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
 
-      - name: Build APK
+      - name: Build debug APK
         shell: bash
         run: |
           set -euo pipefail
