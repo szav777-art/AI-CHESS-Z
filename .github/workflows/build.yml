@@ -39,10 +39,8 @@ jobs:
           unzip -q "$ZIP_FILE" -d extracted
 
           PROJECT_DIR=""
-
           while IFS= read -r SETTINGS; do
             DIR="$(dirname "$SETTINGS")"
-
             if [ -f "$DIR/app/build.gradle" ] || [ -f "$DIR/app/build.gradle.kts" ]; then
               PROJECT_DIR="$DIR"
               break
@@ -67,12 +65,20 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Accept SDK licenses
+        shell: bash
+        run: |
+          set -euo pipefail
+          yes | sdkmanager --licenses || true
+
       - name: Install Android SDK packages
         shell: bash
         run: |
-          set -e
-          yes | sdkmanager --licenses || true
-          sdkmanager --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+          set -euo pipefail
+          sdkmanager --install \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.0"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
