@@ -27,14 +27,11 @@ jobs:
 
           if [ ! -f "$ZIP" ]; then
             echo "::error::Archive not found: $ZIP"
-            echo "Repository root contents:"
             ls -la
             exit 1
           fi
 
-          echo "Checking ZIP archive..."
           unzip -t "$ZIP"
-
           mkdir -p project
           unzip -q "$ZIP" -d project
 
@@ -43,15 +40,14 @@ jobs:
             -print -quit)"
 
           if [ -z "$SETTINGS" ]; then
-            echo "::error::Gradle settings file not found in ZIP"
+            echo "::error::Gradle settings file not found"
             find project -maxdepth 5 -type f
             exit 1
           fi
 
           PROJECT_DIR="$(dirname "$SETTINGS")"
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-
-          echo "Android project directory: $PROJECT_DIR"
+          echo "Project directory: $PROJECT_DIR"
           ls -la "$PROJECT_DIR"
 
       - name: Set up Java 17
@@ -60,19 +56,17 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Accept Android SDK licenses
-        shell: bash
-        run: |
-          yes | sdkmanager --licenses || true
+      - name: Set up Android SDK and accept licenses
+        uses: android-actions/setup-android@v4
+        with:
+          accept-android-sdk-licenses: "true"
+          log-accepted-android-sdk-licenses: "false"
+          packages: "platform-tools"
 
       - name: Install Android SDK components
         shell: bash
         run: |
           sdkmanager \
-            "platform-tools" \
             "platforms;android-35" \
             "build-tools;35.0.0"
 
@@ -92,14 +86,16 @@ jobs:
         run: |
           APK_DIR="$PROJECT_DIR/app/build/outputs/apk/debug"
 
-          if ! find "$APK_DIR" -maxdepth 1 -name "*.apk" -type f \
-            -print -quit 2>/dev/null | grep -q .; then
+          if ! find "$APK_DIR" -maxdepth 1 \
+            -type f -name "*.apk" -print -quit 2>/dev/null \
+            | grep -q .; then
             echo "::error::APK was not generated"
             find "$PROJECT_DIR" -path "*/build/outputs/*" -type f
             exit 1
           fi
 
-          find "$APK_DIR" -maxdepth 1 -name "*.apk" -type f -ls
+          find "$APK_DIR" -maxdepth 1 \
+            -type f -name "*.apk" -ls
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
