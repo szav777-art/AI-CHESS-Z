@@ -1,5 +1,4 @@
-
-name: Build AI-CHESS-Z 0.9.2 APK
+name: Build AI-CHESS-Z 1.0.0 APK
 
 on:
   workflow_dispatch:
@@ -21,46 +20,36 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Java 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
-
-      - name: Find and extract project ZIP
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          ZIP_FILE="AI-CHESS-Z_Android_0.9.2_ENGINE_IMPORT_FIX.zip"
-
-          if [ ! -f "$ZIP_FILE" ]; then
-            echo "ERROR: Project ZIP not found: $ZIP_FILE"
-            find . -maxdepth 3 -type f -name '*.zip' -print
-            exit 1
-          fi
-
-          mkdir -p extracted
-          unzip -q "$ZIP_FILE" -d extracted
-
-          PROJECT_DIR="extracted/AI_CHESS_Z_Android"
-
-          if [ ! -f "$PROJECT_DIR/settings.gradle.kts" ]; then
-            echo "ERROR: Gradle settings file not found"
-            find extracted -maxdepth 5 -type f
-            exit 1
-          fi
-
-          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
 
-      - name: Configure Android SDK
+      - name: Find and extract project ZIP
         shell: bash
         run: |
           set -euo pipefail
+          ZIP_FILE="AI-CHESS-Z_Android_1.0.0_ENGINE_GUI_DUAL.zip"
+          test -f "$ZIP_FILE" || {
+            echo "ERROR: Missing $ZIP_FILE"
+            find . -maxdepth 3 -name '*.zip' -print
+            exit 1
+          }
+          mkdir -p extracted
+          unzip -q "$ZIP_FILE" -d extracted
+          SETTINGS_FILE="$(find extracted -type f -name settings.gradle.kts -print -quit)"
+          test -n "$SETTINGS_FILE"
+          PROJECT_DIR="$(dirname "$SETTINGS_FILE")"
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+
+      - name: Configure Android SDK
+        shell: bash
+        run: |
           echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
           echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
           echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
@@ -88,8 +77,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AI-CHESS-Z-0.9.2-debug-APK
-          path: extracted/AI_CHESS_Z_Android/app/build/outputs/apk/debug/*.apk
+          name: AI-CHESS-Z-1.0.0-debug-APK
+          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 14
-          
