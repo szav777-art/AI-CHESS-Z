@@ -27,13 +27,16 @@ jobs:
 
       - name: Настроить Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          accept-android-sdk-licenses: 'true'
+          log-accepted-android-sdk-licenses: 'false'
+          packages: 'platform-tools'
 
-      - name: Принять лицензии Android SDK
-        run: yes | sdkmanager --licenses || true
-
-      - name: Установить Android SDK
+      - name: Установить необходимые компоненты Android
+        shell: bash
         run: |
-          sdkmanager \
+          set -euo pipefail
+          sdkmanager --install \
             "platform-tools" \
             "platforms;android-35" \
             "build-tools;35.0.0"
@@ -65,14 +68,13 @@ jobs:
             | head -n 1 || true)"
 
           if [ -z "$BUILD_FILE" ]; then
-            echo "::error::Корневой build.gradle.kts не найден в ZIP"
+            echo "::error::Корневой build.gradle.kts не найден"
             find "$GITHUB_WORKSPACE/project" -maxdepth 4 -type f
             exit 1
           fi
 
           PROJECT_DIR="$(dirname "$BUILD_FILE")"
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-
           echo "Каталог проекта: $PROJECT_DIR"
 
       - name: Настроить Gradle 8.9
@@ -81,7 +83,9 @@ jobs:
           gradle-version: '8.9'
 
       - name: Собрать APK
+        shell: bash
         run: |
+          set -euo pipefail
           cd "$PROJECT_DIR"
           gradle assembleDebug --stacktrace
 
@@ -109,3 +113,4 @@ jobs:
           path: project/**/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 14
+          
