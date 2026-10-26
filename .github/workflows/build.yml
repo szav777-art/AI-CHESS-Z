@@ -1,4 +1,5 @@
-name: Build AI-CHESS-Z APK
+
+name: Build AI-CHESS-Z 0.9.1 APK
 
 on:
   workflow_dispatch:
@@ -25,54 +26,37 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.9'
-
       - name: Find and extract project ZIP
         shell: bash
         run: |
           set -euo pipefail
 
-          ZIP_FILE="$(find . -maxdepth 4 -type f \
-            -name 'AI-CHESS-Z_Android*.zip' \
-            -print | sort -V | tail -n 1)"
+          ZIP_FILE="AI-CHESS-Z_Android_0.9.1_DEBUG_LOG_BRONZE.zip"
 
-          if [ -z "$ZIP_FILE" ]; then
-            echo "ERROR: Android project ZIP not found."
-            find . -maxdepth 4 -type f -name '*.zip' -print
+          if [ ! -f "$ZIP_FILE" ]; then
+            echo "ERROR: Project ZIP not found: $ZIP_FILE"
+            echo "ZIP files in repository:"
+            find . -maxdepth 3 -type f -name '*.zip' -print
             exit 1
           fi
-
-          echo "Using archive: $ZIP_FILE"
 
           mkdir -p extracted
           unzip -q "$ZIP_FILE" -d extracted
 
-          SETTINGS_FILE="$(find extracted -type f \
-            \( -name settings.gradle \
-            -o -name settings.gradle.kts \) \
-            -print -quit)"
+          PROJECT_DIR="extracted/AI_CHESS_Z_Android"
 
-          if [ -z "$SETTINGS_FILE" ]; then
-            echo "ERROR: Gradle settings file not found in ZIP."
-            find extracted -maxdepth 5 -type f | head -100
+          if [ ! -f "$PROJECT_DIR/settings.gradle.kts" ]; then
+            echo "ERROR: settings.gradle.kts not found in $PROJECT_DIR"
+            find extracted -maxdepth 5 -type f
             exit 1
           fi
 
-          PROJECT_DIR="$(dirname "$SETTINGS_FILE")"
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
-          VERSION="$(basename "$ZIP_FILE" \
-            | grep -oE '0\.[0-9]+(\.[0-9]+)?' \
-            | head -1 || true)"
-
-          if [ -z "$VERSION" ]; then
-            VERSION="latest"
-          fi
-
-          echo "APP_VERSION=$VERSION" >> "$GITHUB_ENV"
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
 
       - name: Configure Android SDK
         shell: bash
@@ -100,12 +84,13 @@ jobs:
         run: |
           set -euo pipefail
           cd "$PROJECT_DIR"
-          gradle --no-daemon --stacktrace assembleDebug
+          gradle --no-daemon --stacktrace :app:assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AI-CHESS-Z-${{ env.APP_VERSION }}-debug-APK
-          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk
+          name: AI-CHESS-Z-0.9.1-debug-APK
+          path: extracted/AI_CHESS_Z_Android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 14
+          
