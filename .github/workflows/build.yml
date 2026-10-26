@@ -1,4 +1,4 @@
-name: Build APK AI-CHESS-Z
+name: Сборка APK AI-CHESS-Z
 
 on:
   workflow_dispatch:
@@ -11,48 +11,57 @@ permissions:
 
 jobs:
   build:
-    name: Build Android APK
+    name: Создать APK для Android
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download repository files
+      - name: Получить файлы репозитория
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      - name: Установить Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
+          cache: gradle
 
-      - name: Set up Android SDK
+      - name: Настроить Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: ''
 
-      - name: Accept Android SDK licenses
+      - name: Принять лицензии Android SDK
         run: yes | sdkmanager --licenses || true
 
-      - name: Find and extract project ZIP
+      - name: Найти и распаковать ZIP проекта
         shell: bash
         run: |
           set -euo pipefail
 
           ZIP_FILE="$(find . -maxdepth 2 -type f -iname '*.zip' \
-            ! -path './.git/*' | head -n 1)"
+            ! -path './.git/*' | head -n 1 || true)"
 
           if [ -z "$ZIP_FILE" ]; then
-            echo "::error::Project ZIP not found in repository root."
+            echo "::error::ZIP проекта не найден в репозитории."
             exit 1
           fi
 
-          echo "Project archive: $ZIP_FILE"
           mkdir -p "$GITHUB_WORKSPACE/project"
           unzip -q "$ZIP_FILE" -d "$GITHUB_WORKSPACE/project"
 
-          echo "Extracted files:"
-          find "$GITHUB_WORKSPACE/project" -maxdepth 4 \
+          echo "Найден архив: $ZIP_FILE"
+          find "$GITHUB_WORKSPACE/project" -type f \
             \( -name gradlew -o -name settings.gradle \
             -o -name settings.gradle.kts \) -print
 
-      - name: Build debug APK
+      - name: Установить компоненты SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdkmanager "platform-tools" "platforms;android-35" \
+            "build-tools;35.0.0"
+
+      - name: Собрать APK
         shell: bash
         run: |
           set -euo pipefail
@@ -61,19 +70,16 @@ jobs:
             -type f -name gradlew | head -n 1 || true)"
 
           if [ -z "$GRADLEW" ]; then
-            echo "::error::gradlew not found inside project ZIP."
-            echo "The archive may not contain a complete Gradle project."
+            echo "::error::В ZIP не найден gradlew."
             exit 1
           fi
 
           PROJECT_DIR="$(dirname "$GRADLEW")"
           cd "$PROJECT_DIR"
           chmod +x gradlew
-
-          ./gradlew --version
           ./gradlew assembleDebug --stacktrace
 
-      - name: Upload APK artifact
+      - name: Сохранить APK
         uses: actions/upload-artifact@v4
         with:
           name: AI-CHESS-Z-debug-APK
