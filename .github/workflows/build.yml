@@ -27,12 +27,8 @@ jobs:
 
       - name: Настроить Android SDK
         uses: android-actions/setup-android@v3
-        with:
-          accept-android-sdk-licenses: 'true'
-          log-accepted-android-sdk-licenses: 'false'
-          packages: 'platform-tools'
 
-      - name: Установить необходимые компоненты Android
+      - name: Установить компоненты Android SDK
         shell: bash
         run: |
           set -euo pipefail
@@ -41,22 +37,19 @@ jobs:
             "platforms;android-35" \
             "build-tools;35.0.0"
 
-      - name: Найти и распаковать ZIP проекта
+      - name: Найти и распаковать ZIP проекта 1.0.4
         shell: bash
         run: |
           set -euo pipefail
 
-          ZIP_FILE="$(find . -maxdepth 2 -type f \
-            -iname '*.zip' \
-            ! -path './.git/*' \
-            | head -n 1 || true)"
+          ZIP_FILE="AI-CHESS-Z_Android_1.0.4_KOTLIN_REGEX_FIX.zip"
 
-          if [ -z "$ZIP_FILE" ]; then
-            echo "::error::ZIP проекта не найден в репозитории"
+          if [ ! -f "$ZIP_FILE" ]; then
+            echo "::error::Не найден $ZIP_FILE в корне репозитория"
+            echo "Содержимое корня репозитория:"
+            ls -la
             exit 1
           fi
-
-          echo "Найден архив: $ZIP_FILE"
 
           mkdir -p "$GITHUB_WORKSPACE/project"
           unzip -q "$ZIP_FILE" -d "$GITHUB_WORKSPACE/project"
@@ -65,17 +58,17 @@ jobs:
             -type f \
             -name build.gradle.kts \
             ! -path '*/app/*' \
-            | head -n 1 || true)"
+            -print -quit)"
 
           if [ -z "$BUILD_FILE" ]; then
-            echo "::error::Корневой build.gradle.kts не найден"
-            find "$GITHUB_WORKSPACE/project" -maxdepth 4 -type f
+            echo "::error::Корневой build.gradle.kts не найден в ZIP"
+            find "$GITHUB_WORKSPACE/project" -maxdepth 5 -type f
             exit 1
           fi
 
           PROJECT_DIR="$(dirname "$BUILD_FILE")"
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-          echo "Каталог проекта: $PROJECT_DIR"
+          echo "Проект: $PROJECT_DIR"
 
       - name: Настроить Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
@@ -89,7 +82,7 @@ jobs:
           cd "$PROJECT_DIR"
           gradle assembleDebug --stacktrace
 
-      - name: Проверить наличие APK
+      - name: Проверить APK
         shell: bash
         run: |
           set -euo pipefail
@@ -97,14 +90,14 @@ jobs:
           APK="$(find "$PROJECT_DIR" \
             -type f \
             -path '*/build/outputs/apk/debug/*.apk' \
-            | head -n 1 || true)"
+            -print -quit)"
 
           if [ -z "$APK" ]; then
-            echo "::error::APK после сборки не найден"
+            echo "::error::APK не найден после сборки"
             exit 1
           fi
 
-          echo "APK создан: $APK"
+          echo "APK успешно создан: $APK"
 
       - name: Загрузить APK
         uses: actions/upload-artifact@v4
