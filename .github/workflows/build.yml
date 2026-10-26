@@ -1,4 +1,3 @@
-
 name: Build AI-CHESS-Z APK
 
 on:
@@ -35,20 +34,45 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ZIP_FILE="$(find . -maxdepth 3 -type f -name 'AI-CHESS-Z_Android_Shell_OEX_0.8.2_CROWN_CLEAR_PIECES.zip' -print -quit)"
+
+          ZIP_FILE="$(find . -maxdepth 4 -type f \
+            -name 'AI-CHESS-Z_Android*.zip' \
+            -print | sort -V | tail -n 1)"
+
           if [ -z "$ZIP_FILE" ]; then
-            echo "ERROR: Version 0.8.2 ZIP not found in repository root."
-            find . -maxdepth 3 -type f -name '*.zip'
+            echo "ERROR: Android project ZIP not found."
+            find . -maxdepth 4 -type f -name '*.zip' -print
             exit 1
           fi
+
+          echo "Using archive: $ZIP_FILE"
+
           mkdir -p extracted
           unzip -q "$ZIP_FILE" -d extracted
-          SETTINGS_FILE="$(find extracted -type f \( -name settings.gradle -o -name settings.gradle.kts \) -print -quit)"
+
+          SETTINGS_FILE="$(find extracted -type f \
+            \( -name settings.gradle \
+            -o -name settings.gradle.kts \) \
+            -print -quit)"
+
           if [ -z "$SETTINGS_FILE" ]; then
             echo "ERROR: Gradle settings file not found in ZIP."
+            find extracted -maxdepth 5 -type f | head -100
             exit 1
           fi
-          echo "PROJECT_DIR=$(dirname "$SETTINGS_FILE")" >> "$GITHUB_ENV"
+
+          PROJECT_DIR="$(dirname "$SETTINGS_FILE")"
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+
+          VERSION="$(basename "$ZIP_FILE" \
+            | grep -oE '0\.[0-9]+(\.[0-9]+)?' \
+            | head -1 || true)"
+
+          if [ -z "$VERSION" ]; then
+            VERSION="latest"
+          fi
+
+          echo "APP_VERSION=$VERSION" >> "$GITHUB_ENV"
 
       - name: Configure Android SDK
         shell: bash
@@ -81,8 +105,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AI-CHESS-Z-0.8.2-debug-APK
-          path: extracted/**/app/build/outputs/apk/debug/*.apk
+          name: AI-CHESS-Z-${{ env.APP_VERSION }}-debug-APK
+          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 14
-          
