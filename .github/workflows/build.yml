@@ -1,11 +1,11 @@
 
-name: Build AI-CHESS-Z 1.0.6 APK
+name: Build AI-CHESS-Z 1.0.7 APK
 
 on:
   workflow_dispatch:
   push:
     paths:
-      - "AI_CHESS_Z_1_0_6_UI_ANALYSIS.zip"
+      - "AI_CHESS_Z_Android_1_0_7_UI_ENGINE.zip"
       - ".github/workflows/build.yml"
 
 permissions:
@@ -22,14 +22,30 @@ jobs:
       - name: Check and extract project ZIP
         shell: bash
         run: |
-          set -e
-          test -f AI_CHESS_Z_1_0_6_UI_ANALYSIS.zip
+          set -euo pipefail
+          ZIP="AI_CHESS_Z_Android_1_0_7_UI_ENGINE.zip"
+          test -f "$ZIP" || {
+            echo "ERROR: $ZIP not found in repository root"
+            exit 1
+          }
+
           mkdir -p android-project
-          unzip -q AI_CHESS_Z_1_0_6_UI_ANALYSIS.zip -d android-project
-          PROJECT_DIR="$(find android-project -type f -name settings.gradle.kts -print -quit | xargs -r dirname)"
-          test -n "$PROJECT_DIR"
+          unzip -q "$ZIP" -d android-project
+
+          SETTINGS_FILE="$(find android-project -type f \
+            \( -name settings.gradle.kts -o -name settings.gradle \) \
+            -print -quit)"
+
+          test -n "$SETTINGS_FILE" || {
+            echo "ERROR: Gradle settings file not found in ZIP"
+            exit 1
+          }
+
+          PROJECT_DIR="$(dirname "$SETTINGS_FILE")"
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
           echo "Project directory: $PROJECT_DIR"
+          test -f "$PROJECT_DIR/app/build.gradle.kts" -o \
+               -f "$PROJECT_DIR/app/build.gradle"
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -43,7 +59,7 @@ jobs:
           accept-android-sdk-licenses: "true"
           packages: "platform-tools platforms;android-35 build-tools;35.0.0"
 
-      - name: Install Gradle 8.9
+      - name: Set up Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
@@ -51,14 +67,14 @@ jobs:
       - name: Build debug APK
         shell: bash
         run: |
-          set -e
+          set -euo pipefail
           cd "$PROJECT_DIR"
           gradle --no-daemon assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AI-CHESS-Z-1.0.6-debug-APK
+          name: AI-CHESS-Z-1.0.7-debug-APK
           path: "${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk"
           if-no-files-found: error
           retention-days: 14
