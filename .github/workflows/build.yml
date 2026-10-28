@@ -1,11 +1,11 @@
 
-name: Build AI-CHESS-Z 1.1.4 APK
+name: Build AI-CHESS-Z 1.1.5 APK
 
 on:
   workflow_dispatch:
   push:
     paths:
-      - "AI_CHESS_Z_Android_1_1_4_UCI_SYNC_LAYOUT.zip"
+      - "AI_CHESS_Z_Android_1_1_5_LAYOUT_NUMERIC_SETTINGS.zip"
       - ".github/workflows/build.yml"
 
 permissions:
@@ -18,16 +18,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Extract and validate project
+      - name: Extract project
         shell: bash
         run: |
           set -euo pipefail
-          ZIP="AI_CHESS_Z_Android_1_1_4_UCI_SYNC_LAYOUT.zip"
-          test -f "$ZIP" || {
-            echo "ERROR: missing $ZIP in repository root"
-            exit 1
-          }
-
+          ZIP="AI_CHESS_Z_Android_1_1_5_LAYOUT_NUMERIC_SETTINGS.zip"
+          test -f "$ZIP"
           mkdir -p android-project
           unzip -q "$ZIP" -d android-project
 
@@ -35,17 +31,10 @@ jobs:
             -name settings.gradle.kts -o \
             -name settings.gradle \
           \) -print -quit)"
-
-          test -n "$SETTINGS" || {
-            echo "ERROR: Gradle settings file not found"
-            exit 1
-          }
-
+          test -n "$SETTINGS"
           PROJECT_DIR="$(dirname "$SETTINGS")"
-
           test -f "$PROJECT_DIR/app/build.gradle.kts" -o \
                -f "$PROJECT_DIR/app/build.gradle"
-
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
       - name: Set up JDK 17
@@ -60,12 +49,12 @@ jobs:
           accept-android-sdk-licenses: "true"
           packages: "platform-tools platforms;android-35 build-tools;35.0.0"
 
-      - name: Set up Gradle 8.9
+      - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
 
-      - name: Build debug APK
+      - name: Build APK
         shell: bash
         run: |
           set -euo pipefail
@@ -75,7 +64,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AI-CHESS-Z-1.1.4-debug-APK
+          name: AI-CHESS-Z-1.1.5-debug-APK
           path: "${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk"
           if-no-files-found: error
           retention-days: 14
