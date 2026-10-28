@@ -1,10 +1,11 @@
-name: Build AI-CHESS-Z 1.1.1 APK
+
+name: Build AI-CHESS-Z 1.1.2 APK
 
 on:
   workflow_dispatch:
   push:
     paths:
-      - "AI_CHESS_Z_Android_1_1_1_UCI_QUEUES.zip"
+      - "AI_CHESS_Z_Android_1_1_2_ENGINE_VS_ENGINE.zip"
       - ".github/workflows/build.yml"
 
 permissions:
@@ -23,8 +24,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          ZIP="AI_CHESS_Z_Android_1_1_1_UCI_QUEUES.zip"
-
+          ZIP="AI_CHESS_Z_Android_1_1_2_ENGINE_VS_ENGINE.zip"
           test -f "$ZIP" || {
             echo "ERROR: missing $ZIP in repository root"
             exit 1
@@ -78,7 +78,8 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AI-CHESS-Z-1.1.1-debug-APK
+          name: AI-CHESS-Z-1.1.2-debug-APK
           path: "${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk"
           if-no-files-found: error
           retention-days: 14
+          
