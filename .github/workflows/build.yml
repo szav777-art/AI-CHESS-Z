@@ -1,11 +1,11 @@
 
-name: Build AI-CHESS-Z 1.1.8 APK
+name: Build AI-CHESS-Z 1.1.9 APK
 
 on:
   workflow_dispatch:
   push:
     paths:
-      - "AI_CHESS_Z_Android_1_1_8_DOTTED_HINT_CONTRAST.zip"
+      - "AI_CHESS_Z_Android_1_1_9_SCORE_LINE_STABILITY.zip"
       - ".github/workflows/build.yml"
 
 permissions:
@@ -22,12 +22,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ZIP="AI_CHESS_Z_Android_1_1_8_DOTTED_HINT_CONTRAST.zip"
-          test -f "$ZIP" || {
-            echo "ERROR: ZIP not found in repository root"
-            exit 1
-          }
-
+          ZIP="AI_CHESS_Z_Android_1_1_9_SCORE_LINE_STABILITY.zip"
+          test -f "$ZIP"
           mkdir -p android-project
           unzip -q "$ZIP" -d android-project
 
@@ -35,13 +31,9 @@ jobs:
             -name settings.gradle.kts -o \
             -name settings.gradle \
           \) -print -quit)"
-
-          test -n "$SETTINGS" || {
-            echo "ERROR: Gradle settings file not found"
-            exit 1
-          }
-
+          test -n "$SETTINGS"
           PROJECT_DIR="$(dirname "$SETTINGS")"
+
           test -f "$PROJECT_DIR/app/build.gradle.kts" -o \
                -f "$PROJECT_DIR/app/build.gradle"
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
@@ -73,7 +65,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AI-CHESS-Z-1.1.8-debug-APK
+          name: AI-CHESS-Z-1.1.9-debug-APK
           path: "${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk"
           if-no-files-found: error
           retention-days: 14
