@@ -1,11 +1,11 @@
 
-name: Build AI-CHESS-Z 1.1.7 APK
+name: Build AI-CHESS-Z 1.1.8 APK
 
 on:
   workflow_dispatch:
   push:
     paths:
-      - "AI_CHESS_Z_Android_1_1_7_ANALYSIS_ARROW_POWER_TOGGLE.zip"
+      - "AI_CHESS_Z_Android_1_1_8_DOTTED_HINT_CONTRAST.zip"
       - ".github/workflows/build.yml"
 
 permissions:
@@ -14,7 +14,6 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -23,8 +22,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
-          ZIP="AI_CHESS_Z_Android_1_1_7_ANALYSIS_ARROW_POWER_TOGGLE.zip"
+          ZIP="AI_CHESS_Z_Android_1_1_8_DOTTED_HINT_CONTRAST.zip"
           test -f "$ZIP" || {
             echo "ERROR: ZIP not found in repository root"
             exit 1
@@ -44,10 +42,8 @@ jobs:
           }
 
           PROJECT_DIR="$(dirname "$SETTINGS")"
-
           test -f "$PROJECT_DIR/app/build.gradle.kts" -o \
                -f "$PROJECT_DIR/app/build.gradle"
-
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
       - name: Set up JDK 17
@@ -77,7 +73,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AI-CHESS-Z-1.1.7-debug-APK
+          name: AI-CHESS-Z-1.1.8-debug-APK
           path: "${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk"
           if-no-files-found: error
           retention-days: 14
