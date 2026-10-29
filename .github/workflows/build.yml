@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - "AI_CHESS_Z_Android_1_2_9_UCI_TIMEOUT_RECOVERY_2.zip"
+      - "AI_CHESS_Z_Android_*.zip"
       - ".github/workflows/build.yml"
 
 permissions:
@@ -22,11 +22,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ZIP="AI_CHESS_Z_Android_1_2_9_UCI_TIMEOUT_RECOVERY_2.zip"
-          test -f "$ZIP" || {
-            echo "ERROR: missing $ZIP in repository root"
+          ZIP=$(ls AI_CHESS_Z_Android_*.zip 2>/dev/null | head -n 1)
+          test -n "$ZIP" || {
+            echo "ERROR: missing AI_CHESS_Z_Android_*.zip in repository root"
             exit 1
           }
+          echo "Found ZIP archive: $ZIP"
           mkdir -p android-project
           unzip -q "$ZIP" -d android-project
 
