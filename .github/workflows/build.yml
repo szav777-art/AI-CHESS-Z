@@ -1,12 +1,11 @@
+
 name: Build AI-CHESS-Z APK
 
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
     paths:
-      - "*.zip"
+      - "AI_CHESS_Z_Android_1_2_8_SERIALIZED_UCI_ANALYSIS.zip"
       - ".github/workflows/build.yml"
 
 permissions:
@@ -20,44 +19,28 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Find and extract Android project
+      - name: Extract Android project
         shell: bash
         run: |
           set -euo pipefail
+          ZIP="AI_CHESS_Z_Android_1_2_8_SERIALIZED_UCI_ANALYSIS.zip"
+          test -f "$ZIP"
+          mkdir -p android-project
+          unzip -q "$ZIP" -d android-project
 
-          ZIP="$(find . -maxdepth 2 -type f \
-            -iname 'AI_CHESS_Z*.zip' -print -quit)"
-
-          if [ -z "$ZIP" ]; then
-            echo "::error::ZIP проекта AI-CHESS-Z не найден."
-            echo "Загрузите ZIP в корень репозитория."
-            exit 1
-          fi
-
-          echo "Используется архив: $ZIP"
-          mkdir -p extracted
-          unzip -q "$ZIP" -d extracted
-
-          SETTINGS="$(find extracted -type f \
+          SETTINGS=$(find android-project -type f \
             \( -name settings.gradle.kts -o -name settings.gradle \) \
-            -print -quit)"
+            -print -quit)
 
-          if [ -z "$SETTINGS" ]; then
-            echo "::error::В ZIP не найден Android Gradle project."
-            exit 1
-          fi
-
+          test -n "$SETTINGS"
           PROJECT_DIR="$(dirname "$SETTINGS")"
 
-          if [ ! -f "$PROJECT_DIR/app/build.gradle.kts" ] && \
-             [ ! -f "$PROJECT_DIR/app/build.gradle" ]; then
-            echo "::error::Не найден модуль app."
-            exit 1
-          fi
+          test -f "$PROJECT_DIR/app/build.gradle.kts" \
+            || test -f "$PROJECT_DIR/app/build.gradle"
 
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
-      - name: Set up Java
+      - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -66,23 +49,27 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Android build tools
+      - name: Install Android packages
+        shell: bash
         run: |
-          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+          set -euo pipefail
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
 
       - name: Build APK
         shell: bash
         run: |
           set -euo pipefail
           cd "$PROJECT_DIR"
-
-          if [ -f ./gradlew ]; then
-            chmod +x ./gradlew
-            ./gradlew --no-daemon assembleDebug
-          else
-            echo "::error::В проекте нет Gradle Wrapper (gradlew)."
-            exit 1
-          fi
+          gradle --no-daemon assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
@@ -91,3 +78,4 @@ jobs:
           path: "${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk"
           if-no-files-found: error
           retention-days: 14
+          
