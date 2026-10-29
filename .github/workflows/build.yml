@@ -1,10 +1,11 @@
-name: Build AI-CHESS-Z 1.2.2 APK
+
+name: Build AI-CHESS-Z 1.2.3 APK
 
 on:
   workflow_dispatch:
   push:
     paths:
-      - "AI_CHESS_Z_Android_1_2_2_ANALYSIS_BOARD_CLOCK.zip"
+      - "AI_CHESS_Z_Android_1_2_3_PV_CONTRAST_DEBUG.zip"
       - ".github/workflows/build.yml"
 
 permissions:
@@ -23,7 +24,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          ZIP="AI_CHESS_Z_Android_1_2_2_ANALYSIS_BOARD_CLOCK.zip"
+          ZIP="AI_CHESS_Z_Android_1_2_3_PV_CONTRAST_DEBUG.zip"
           test -f "$ZIP"
 
           mkdir -p android-project
@@ -37,8 +38,11 @@ jobs:
           test -n "$SETTINGS"
           PROJECT_DIR="$(dirname "$SETTINGS")"
 
-          test -f "$PROJECT_DIR/app/build.gradle.kts" -o \
-               -f "$PROJECT_DIR/app/build.gradle"
+          if [ ! -f "$PROJECT_DIR/app/build.gradle.kts" ] && \
+             [ ! -f "$PROJECT_DIR/app/build.gradle" ]; then
+            echo "Android app Gradle file not found" >&2
+            exit 1
+          fi
 
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
@@ -69,7 +73,8 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AI-CHESS-Z-1.2.2-debug-APK
+          name: AI-CHESS-Z-1.2.3-debug-APK
           path: "${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk"
           if-no-files-found: error
           retention-days: 14
+          
