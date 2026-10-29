@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - "AI_CHESS_Z_Android_1_2_9_UCI_TIMEOUT_RECOVERY.zip"
+      - "AI_CHESS_Z_Android_1_2_9*.zip"
       - ".github/workflows/build.yml"
 
 permissions:
@@ -12,66 +12,54 @@ permissions:
 
 jobs:
   build:
-    name: Build Android APK
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Extract project ZIP
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          ZIP="AI_CHESS_Z_Android_1_2_9_UCI_TIMEOUT_RECOVERY.zip"
-          test -f "$ZIP"
-
-          mkdir -p android-project
-          unzip -q "$ZIP" -d android-project
-
-          PROJECT_DIR="android-project/AI_CHESS_Z_Android"
-
-          test -f "$PROJECT_DIR/settings.gradle.kts"
-          test -f "$PROJECT_DIR/app/build.gradle.kts"
-
-          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-
-      - name: Set up Java 17
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install Android SDK packages
+      - name: Accept Android SDK licenses
         shell: bash
         run: |
-          set -euo pipefail
-          yes | sdkmanager --licenses || true
-          sdkmanager \
+          set -e
+          yes | sdkmanager --licenses
+          sdkmanager --install \
             "platform-tools" \
             "platforms;android-35" \
             "build-tools;35.0.0"
 
-      - name: Set up Gradle 8.9
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: "8.9"
+      - name: Extract Android project
+        shell: bash
+        run: |
+          set -euo pipefail
+          ZIP="$(find . -maxdepth 1 -type f -name 'AI_CHESS_Z_Android_1_2_9*.zip' | head -n 1)"
+          test -n "$ZIP"
+          mkdir -p android-project
+          unzip -q "$ZIP" -d android-project
+          SETTINGS="$(find android-project -type f \( -name settings.gradle.kts -o -name settings.gradle \) -print -quit)"
+          test -n "$SETTINGS"
+          PROJECT_DIR="$(dirname "$SETTINGS")"
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+          test -f "$PROJECT_DIR/gradlew"
 
       - name: Build debug APK
         shell: bash
         run: |
           set -euo pipefail
           cd "$PROJECT_DIR"
-          gradle --no-daemon clean assembleDebug
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: AI-CHESS-Z-1.2.9-APK
-          path: android-project/AI_CHESS_Z_Android/app/build/outputs/apk/debug/*.apk
+          path: "${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk"
           if-no-files-found: error
           retention-days: 14
