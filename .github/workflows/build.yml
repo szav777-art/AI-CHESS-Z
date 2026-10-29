@@ -3,9 +3,9 @@ name: Build AI-CHESS-Z APK
 on:
   workflow_dispatch:
   push:
-    paths:
-      - "AI_CHESS_Z_Android_1_2_8_SERIALIZED_UCI_ANALYSIS.zip"
-      - ".github/workflows/build.yml"
+    branches:
+      - main
+      - master
 
 permissions:
   contents: read
@@ -18,34 +18,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Extract Android project
+      - name: Check and extract ZIP
         shell: bash
         run: |
           set -euo pipefail
-
           ZIP="AI_CHESS_Z_Android_1_2_8_SERIALIZED_UCI_ANALYSIS.zip"
-          test -f "$ZIP" || {
-            echo "ERROR: ZIP file not found in repository root"
-            exit 1
-          }
-
+          test -f "$ZIP"
           mkdir -p android-project
           unzip -q "$ZIP" -d android-project
-
-          SETTINGS=$(find android-project -type f \
-            \( -name settings.gradle.kts -o -name settings.gradle \) \
-            -print -quit)
-
-          test -n "$SETTINGS" || {
-            echo "ERROR: Gradle settings file not found in ZIP"
-            exit 1
-          }
-
-          PROJECT_DIR="$(dirname "$SETTINGS")"
-
-          test -f "$PROJECT_DIR/app/build.gradle.kts" \
-            || test -f "$PROJECT_DIR/app/build.gradle"
-
+          PROJECT_DIR="$(find android-project -type f -name settings.gradle.kts -print -quit | xargs -r dirname)"
+          if [ -z "$PROJECT_DIR" ]; then
+            PROJECT_DIR="$(find android-project -type f -name settings.gradle -print -quit | xargs -r dirname)"
+          fi
+          test -n "$PROJECT_DIR"
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
       - name: Set up Java 17
@@ -56,19 +41,17 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
-        with:
-          accept-android-sdk-licenses: true
-          packages: |
-            platform-tools
-            platforms;android-35
-            build-tools;35.0.0
+
+      - name: Install Android SDK packages
+        run: |
+          sdkmanager "platforms;android-35" "build-tools;35.0.0"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
 
-      - name: Build debug APK
+      - name: Build APK
         shell: bash
         run: |
           set -euo pipefail
@@ -78,7 +61,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AI-CHESS-Z-debug-APK
+          name: AI-CHESS-Z-1.2.8-debug-APK
           path: "${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk"
           if-no-files-found: error
           retention-days: 14
