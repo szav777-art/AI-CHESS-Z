@@ -1,11 +1,10 @@
-
-name: Build AI-CHESS-Z 1.2.6 APK
+name: Build AI-CHESS-Z 1.2.7 APK
 
 on:
   workflow_dispatch:
   push:
     paths:
-      - "AI_CHESS_Z_Android_1_2_6_EMERGENCY_UCI_ANALYSIS.zip"
+      - "AI_CHESS_Z_Android_1_2_7_SCOREBOARD_UI_REVIEW.zip"
       - ".github/workflows/build.yml"
 
 permissions:
@@ -24,7 +23,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          ZIP="AI_CHESS_Z_Android_1_2_6_EMERGENCY_UCI_ANALYSIS.zip"
+          ZIP="AI_CHESS_Z_Android_1_2_7_SCOREBOARD_UI_REVIEW.zip"
           test -f "$ZIP"
 
           mkdir -p android-project
@@ -73,8 +72,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AI-CHESS-Z-1.2.6-debug-APK
+          name: AI-CHESS-Z-1.2.7-debug-APK
           path: "${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk"
           if-no-files-found: error
           retention-days: 14
-          
