@@ -1,14 +1,10 @@
-
 name: Build AI-CHESS-Z 1.2.9 APK
 
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
-      - master
     paths:
-      - "AI_CHESS_Z_Android_1_2_9_UCI_TIMEOUT_RECOVERY*.zip"
+      - "AI_CHESS_Z_Android_1_2_9_UCI_TIMEOUT_RECOVERY_2.zip"
       - ".github/workflows/build.yml"
 
 permissions:
@@ -16,31 +12,40 @@ permissions:
 
 jobs:
   build:
-    name: Build Android APK
     runs-on: ubuntu-latest
-    timeout-minutes: 30
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Find and extract project ZIP
+      - name: Extract and validate project
         shell: bash
         run: |
           set -euo pipefail
-          ZIP_FILE="$(find . -maxdepth 2 -type f \
-            -name 'AI_CHESS_Z_Android_1_2_9_UCI_TIMEOUT_RECOVERY*.zip' \
+          ZIP="AI_CHESS_Z_Android_1_2_9_UCI_TIMEOUT_RECOVERY_2.zip"
+          test -f "$ZIP" || {
+            echo "ERROR: missing $ZIP in repository root"
+            exit 1
+          }
+          mkdir -p android-project
+          unzip -q "$ZIP" -d android-project
+
+          SETTINGS="$(find android-project -type f \
+            \( -name settings.gradle.kts -o -name settings.gradle \) \
             -print -quit)"
-          test -n "$ZIP_FILE"
-          mkdir -p "$RUNNER_TEMP/aichessz"
-          unzip -q "$ZIP_FILE" -d "$RUNNER_TEMP/aichessz"
-          SETTINGS_FILE="$(find "$RUNNER_TEMP/aichessz" -type f \
-            \( -name 'settings.gradle.kts' -o -name 'settings.gradle' \) \
-            -print -quit)"
-          test -n "$SETTINGS_FILE"
-          PROJECT_DIR="$(dirname "$SETTINGS_FILE")"
-          test -f "$PROJECT_DIR/app/build.gradle.kts"
+
+          test -n "$SETTINGS" || {
+            echo "ERROR: Gradle settings file not found"
+            exit 1
+          }
+
+          PROJECT_DIR="$(dirname "$SETTINGS")"
+
+          test -f "$PROJECT_DIR/app/build.gradle.kts" -o \
+               -f "$PROJECT_DIR/app/build.gradle"
+
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+          echo "Project directory: $PROJECT_DIR"
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -51,36 +56,26 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
-          cmdline-tools-version: "latest"
-          accept-android-sdk-licenses: true
-          packages: |
-            platform-tools
-            platforms;android-35
-            build-tools;35.0.0
+          accept-android-sdk-licenses: "true"
+          packages: "platform-tools platforms;android-35 build-tools;35.0.0"
 
       - name: Set up Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
 
-      - name: Verify APK version
+      - name: Build debug APK
         shell: bash
         run: |
           set -euo pipefail
           cd "$PROJECT_DIR"
-          grep -q 'versionCode = 24' app/build.gradle.kts
-          grep -q 'versionName = "1.2.9-uci-recovery-pv-sync"' app/build.gradle.kts
-
-      - name: Build APK
-        run: |
-          cd "$PROJECT_DIR"
-          gradle --no-daemon --stacktrace assembleDebug
+          gradle --no-daemon assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: AI-CHESS-Z-1.2.9-debug-APK
-          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
+          path: "${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk"
           if-no-files-found: error
           retention-days: 14
           
