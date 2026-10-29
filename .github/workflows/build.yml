@@ -1,4 +1,3 @@
-
 name: Build AI-CHESS-Z APK
 
 on:
@@ -23,8 +22,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
           ZIP="AI_CHESS_Z_Android_1_2_8_SERIALIZED_UCI_ANALYSIS.zip"
-          test -f "$ZIP"
+          test -f "$ZIP" || {
+            echo "ERROR: ZIP file not found in repository root"
+            exit 1
+          }
+
           mkdir -p android-project
           unzip -q "$ZIP" -d android-project
 
@@ -32,7 +36,11 @@ jobs:
             \( -name settings.gradle.kts -o -name settings.gradle \) \
             -print -quit)
 
-          test -n "$SETTINGS"
+          test -n "$SETTINGS" || {
+            echo "ERROR: Gradle settings file not found in ZIP"
+            exit 1
+          }
+
           PROJECT_DIR="$(dirname "$SETTINGS")"
 
           test -f "$PROJECT_DIR/app/build.gradle.kts" \
@@ -48,23 +56,19 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
-
-      - name: Install Android packages
-        shell: bash
-        run: |
-          set -euo pipefail
-          yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager \
-            "platform-tools" \
-            "platforms;android-35" \
-            "build-tools;35.0.0"
+        with:
+          accept-android-sdk-licenses: true
+          packages: |
+            platform-tools
+            platforms;android-35
+            build-tools;35.0.0
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
 
-      - name: Build APK
+      - name: Build debug APK
         shell: bash
         run: |
           set -euo pipefail
@@ -78,4 +82,3 @@ jobs:
           path: "${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk"
           if-no-files-found: error
           retention-days: 14
-          
