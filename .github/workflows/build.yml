@@ -6,8 +6,8 @@ on:
     branches:
       - main
     paths:
-      - 'AI_CHESS_Z_Android_1_2_8_SERIALIZED_UCI_ANALYSIS.zip'
-      - '.github/workflows/build.yml'
+      - "*.zip"
+      - ".github/workflows/build.yml"
 
 permissions:
   contents: read
@@ -15,76 +15,79 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Extract Android project
+      - name: Find and extract Android project
         shell: bash
         run: |
           set -euo pipefail
-          ZIP="AI_CHESS_Z_Android_1_2_8_SERIALIZED_UCI_ANALYSIS.zip"
-          test -f "$ZIP" || {
-            echo "::error::ZIP not found: $ZIP"
-            exit 1
-          }
-          mkdir -p android-project
-          unzip -q "$ZIP" -d android-project
-          SETTINGS=$(find android-project -type f \
-            \( -name settings.gradle.kts -o -name settings.gradle \) \
-            -print -quit)
-          test -n "$SETTINGS" || {
-            echo "::error::Gradle settings file not found"
-            exit 1
-          }
-          PROJECT_DIR="$(dirname "$SETTINGS")"
-          test -f "$PROJECT_DIR/app/build.gradle.kts" -o \
-               -f "$PROJECT_DIR/app/build.gradle"
-          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-          echo "Android project: $PROJECT_DIR"
 
-      - name: Set up Java 17
+          ZIP="$(find . -maxdepth 2 -type f \
+            -iname 'AI_CHESS_Z*.zip' -print -quit)"
+
+          if [ -z "$ZIP" ]; then
+            echo "::error::ZIP проекта AI-CHESS-Z не найден."
+            echo "Загрузите ZIP в корень репозитория."
+            exit 1
+          fi
+
+          echo "Используется архив: $ZIP"
+          mkdir -p extracted
+          unzip -q "$ZIP" -d extracted
+
+          SETTINGS="$(find extracted -type f \
+            \( -name settings.gradle.kts -o -name settings.gradle \) \
+            -print -quit)"
+
+          if [ -z "$SETTINGS" ]; then
+            echo "::error::В ZIP не найден Android Gradle project."
+            exit 1
+          fi
+
+          PROJECT_DIR="$(dirname "$SETTINGS")"
+
+          if [ ! -f "$PROJECT_DIR/app/build.gradle.kts" ] && \
+             [ ! -f "$PROJECT_DIR/app/build.gradle" ]; then
+            echo "::error::Не найден модуль app."
+            exit 1
+          fi
+
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+
+      - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: "17"
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Accept Android SDK licenses
-        shell: bash
+      - name: Install Android build tools
         run: |
-          yes | sdkmanager --licenses || true
-          sdkmanager \
-            "platform-tools" \
-            "platforms;android-35" \
-            "build-tools;35.0.0"
+          sdkmanager "platforms;android-35" "build-tools;35.0.0"
 
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.9'
-
-      - name: Build debug APK
+      - name: Build APK
         shell: bash
         run: |
           set -euo pipefail
           cd "$PROJECT_DIR"
-          gradle --no-daemon assembleDebug
 
-      - name: Verify APK
-        shell: bash
-        run: |
-          set -euo pipefail
-          find "$PROJECT_DIR/app/build/outputs/apk/debug" \
-            -maxdepth 1 -name '*.apk' -print -quit |
-            grep -q '\.apk$'
+          if [ -f ./gradlew ]; then
+            chmod +x ./gradlew
+            ./gradlew --no-daemon assembleDebug
+          else
+            echo "::error::В проекте нет Gradle Wrapper (gradlew)."
+            exit 1
+          fi
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: AI-CHESS-Z-debug-APK
-          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk
+          path: "${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk"
           if-no-files-found: error
           retention-days: 14
