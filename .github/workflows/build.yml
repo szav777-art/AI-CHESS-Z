@@ -54,29 +54,18 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Setup Android SDK manually
+      - name: Configure Android SDK & Accept Licenses
         shell: bash
         run: |
-          export ANDROID_SDK_ROOT=$HOME/android-sdk
-          mkdir -p $ANDROID_SDK_ROOT/cmdline-tools
+          # Устраняем конфликт, жестко связывая обе переменные на системный путь SDK
+          echo "ANDROID_HOME=/usr/local/lib/android/sdk" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=/usr/local/lib/android/sdk" >> $GITHUB_ENV
           
-          echo "Downloading Android Command Line Tools..."
-          wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdline-tools.zip
-          unzip -q cmdline-tools.zip -d temp-tools
-          mkdir -p $ANDROID_SDK_ROOT/cmdline-tools/latest
-          mv temp-tools/cmdline-tools/* $ANDROID_SDK_ROOT/cmdline-tools/latest/
-          rm -rf cmdline-tools.zip temp-tools
-
-          # Добавляем пути в PATH
-          echo "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin" >> $GITHUB_PATH
-          echo "$ANDROID_SDK_ROOT/platform-tools" >> $GITHUB_PATH
-          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
-
-          # Автоматически принимаем лицензии и ставим компоненты
-          export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
-          yes | sdkmanager --licenses || true
-          sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
-          yes | sdkmanager --licenses || true
+          export ANDROID_HOME=/usr/local/lib/android/sdk
+          export ANDROID_SDK_ROOT=$ANDROID_HOME
+          
+          # Автоматически принимаем лицензии через встроенный sdkmanager
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true
 
       - name: Set up Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
