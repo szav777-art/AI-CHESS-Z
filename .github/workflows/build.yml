@@ -1,14 +1,14 @@
 
-name: Build AI-CHESS-Z APK
+name: Build AI-CHESS-Z 1.3.0 APK
 
 on:
   workflow_dispatch:
   push:
     branches:
       - main
-    - master
+      - master
     paths:
-      - "*.zip"
+      - "AI_CHESS_Z_Android_1_3_0_UI_PV_REVIEW.zip"
       - ".github/workflows/build.yml"
 
 permissions:
@@ -17,93 +17,121 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Find and extract Android project
-        shell: bash
-        run: |
-          set -e
-
-          ZIP_FILE=$(find . -maxdepth 2 -type f -name "*.zip" | head -n 1)
-
-          if [ -z "$ZIP_FILE" ]; then
-            echo "ERROR: Android project ZIP not found!"
-            exit 1
-          fi
-
-          echo "Found archive: $ZIP_FILE"
-
-          mkdir -p android-project
-          unzip -q "$ZIP_FILE" -d android-project
-
-          PROJECT_DIR=$(find android-project -type f \
-            \( -name "settings.gradle.kts" -o -name "settings.gradle" \) \
-            -print -quit | xargs dirname)
-
-          if [ -z "$PROJECT_DIR" ]; then
-            echo "ERROR: Gradle project not found!"
-            exit 1
-          fi
-
-          echo "Android project: $PROJECT_DIR"
-          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-
-      - name: Set up Java 17
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install Android SDK components
+      - name: Extract and validate project ZIP
         shell: bash
         run: |
-          set -e
+          set -euo pipefail
 
-          sdkmanager --install \
+          ZIP_FILE="AI_CHESS_Z_Android_1_3_0_UI_PV_REVIEW.zip"
+
+          if [ ! -f "$ZIP_FILE" ]; then
+            echo "ERROR: ZIP file not found: $ZIP_FILE"
+            echo "Files in repository:"
+            find . -maxdepth 2 -type f
+            exit 1
+          fi
+
+          mkdir -p extracted-project
+          unzip -q "$ZIP_FILE" -d extracted-project
+
+          SETTINGS_FILE="$(find extracted-project -type f \
+            \( -name settings.gradle.kts -o -name settings.gradle \) \
+            -print -quit)"
+
+          if [ -z "$SETTINGS_FILE" ]; then
+            echo "ERROR: Gradle settings file not found"
+            exit 1
+          fi
+
+          PROJECT_DIR="$(dirname "$SETTINGS_FILE")"
+
+          if [ ! -f "$PROJECT_DIR/app/build.gradle.kts" ] && \
+             [ ! -f "$PROJECT_DIR/app/build.gradle" ]; then
+            echo "ERROR: app/build.gradle not found"
+            exit 1
+          fi
+
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+          echo "Android project: $PROJECT_DIR"
+
+      - name: Set up Android SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+
+          if [ ! -f "$SDKMANAGER" ]; then
+            echo "ERROR: sdkmanager not found: $SDKMANAGER"
+            find "$ANDROID_HOME/cmdline-tools" -maxdepth 4 -type f
+            exit 1
+          fi
+
+          yes | "$SDKMANAGER" --licenses || true
+
+          "$SDKMANAGER" --install \
             "platform-tools" \
             "platforms;android-35" \
             "build-tools;35.0.0"
 
-      - name: Set up Gradle
+      - name: Set up Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
 
-      - name: Build APK
+      - name: Build debug APK
         shell: bash
         run: |
-          set -e
+          set -euo pipefail
 
           cd "$PROJECT_DIR"
 
-          gradle --no-daemon assembleDebug
+          gradle --no-daemon \
+            --stacktrace \
+            --warning-mode all \
+            :app:assembleDebug
 
       - name: Verify APK
         shell: bash
         run: |
-          set -e
+          set -euo pipefail
 
-          APK=$(find "$PROJECT_DIR/app/build/outputs/apk/debug" \
-            -type f -name "*.apk" | head -n 1)
+          APK_PATH="$PROJECT_DIR/app/build/outputs/apk/debug"
 
-          if [ -z "$APK" ]; then
-            echo "ERROR: APK was not generated!"
+          if [ ! -d "$APK_PATH" ]; then
+            echo "ERROR: APK output directory not found"
             exit 1
           fi
 
-          echo "APK successfully created: $APK"
+          find "$APK_PATH" -type f -name "*.apk"
 
-      - name: Upload APK
+          APK_FILE="$(find "$APK_PATH" -type f -name "*.apk" -print -quit)"
+
+          if [ -z "$APK_FILE" ]; then
+            echo "ERROR: APK was not generated"
+            exit 1
+          fi
+
+          echo "APK successfully created:"
+          ls -lh "$APK_FILE"
+
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AI-CHESS-Z-APK
-          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk
+          name: AI-CHESS-Z-1.3.0-debug-APK
+          path: "${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk"
           if-no-files-found: error
           retention-days: 14
           
