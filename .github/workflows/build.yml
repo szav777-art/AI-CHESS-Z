@@ -1,10 +1,10 @@
-name: Build AI-CHESS-Z APK
+name: Build AI-CHESS-Z 1.3.0 APK
 
 on:
   workflow_dispatch:
   push:
     paths:
-      - "AI_CHESS_Z_Android_*.zip"
+      - "AI_CHESS_Z_Android_1_3_0_UI_PV_REVIEW.zip"
       - ".github/workflows/build.yml"
 
 permissions:
@@ -18,35 +18,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Extract and validate project
+      - name: Extract project
         shell: bash
         run: |
           set -euo pipefail
-          ZIP=$(ls AI_CHESS_Z_Android_*.zip 2>/dev/null | head -n 1)
-          test -n "$ZIP" || {
-            echo "ERROR: missing AI_CHESS_Z_Android_*.zip in repository root"
-            exit 1
-          }
-          echo "Found ZIP archive: $ZIP"
+          ZIP="AI_CHESS_Z_Android_1_3_0_UI_PV_REVIEW.zip"
+          test -f "$ZIP"
           mkdir -p android-project
           unzip -q "$ZIP" -d android-project
-
-          SETTINGS="$(find android-project -type f \
-            \( -name settings.gradle.kts -o -name settings.gradle \) \
-            -print -quit)"
-
-          test -n "$SETTINGS" || {
-            echo "ERROR: Gradle settings file not found"
-            exit 1
-          }
-
-          PROJECT_DIR="$(dirname "$SETTINGS")"
-
-          test -f "$PROJECT_DIR/app/build.gradle.kts" -o \
-               -f "$PROJECT_DIR/app/build.gradle"
-
-          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-          echo "Project directory: $PROJECT_DIR"
+          PROJECT_DIR="$(find android-project -name settings.gradle.kts -o -name settings.gradle | head -1)"
+          test -n "$PROJECT_DIR"
+          echo "PROJECT_DIR=$(dirname "$PROJECT_DIR")" >> "$GITHUB_ENV"
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -54,37 +36,31 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Configure Android SDK & Accept Licenses
-        shell: bash
-        run: |
-          # Устраняем конфликт, жестко связывая обе переменные на системный путь SDK
-          echo "ANDROID_HOME=/usr/local/lib/android/sdk" >> $GITHUB_ENV
-          echo "ANDROID_SDK_ROOT=/usr/local/lib/android/sdk" >> $GITHUB_ENV
-          
-          export ANDROID_HOME=/usr/local/lib/android/sdk
-          export ANDROID_SDK_ROOT=$ANDROID_HOME
-          
-          # Автоматически принимаем лицензии через встроенный sdkmanager
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          accept-android-sdk-licenses: "true"
 
-      - name: Set up Gradle 8.9
+      - name: Install Android packages
+        run: |
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
 
-      - name: Build debug APK
+      - name: Build APK
         shell: bash
         run: |
           set -euo pipefail
           cd "$PROJECT_DIR"
-          chmod +x gradlew || true
           gradle --no-daemon assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AI-CHESS-Z-debug-APK
+          name: AI-CHESS-Z-1.3.0-APK
           path: "${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk"
           if-no-files-found: error
           retention-days: 14
-          
