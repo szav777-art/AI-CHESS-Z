@@ -60,6 +60,9 @@ jobs:
           accept-android-sdk-licenses: "true"
           packages: "platform-tools platforms;android-35 build-tools;35.0.0"
 
+      - name: Accept Android SDK Licenses
+        run: yes | sdkmanager --licenses || true
+
       - name: Set up Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
         with:
@@ -70,6 +73,7 @@ jobs:
         run: |
           set -euo pipefail
           cd "$PROJECT_DIR"
+          chmod +x gradlew || true
           gradle --no-daemon assembleDebug
 
       - name: Upload APK
@@ -79,4 +83,3 @@ jobs:
           path: "${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk"
           if-no-files-found: error
           retention-days: 14
-          
