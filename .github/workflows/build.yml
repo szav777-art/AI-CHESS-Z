@@ -54,10 +54,19 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          accept-android-sdk-licenses: true
+      - name: Install Android SDK Packages & Accept Licenses
+        shell: bash
+        run: |
+          export ANDROID_SDK_ROOT=$HOME/android-sdk
+          mkdir -p $ANDROID_SDK_ROOT
+          
+          # Установка базовых компонентов SDK через командную строку
+          sdkmanager --sdk_root=$ANDROID_SDK_ROOT "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+          
+          # Автоматическое принятие всех лицензий через yes
+          yes | sdkmanager --sdk_root=$ANDROID_SDK_ROOT --licenses || true
+          
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
 
       - name: Set up Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
