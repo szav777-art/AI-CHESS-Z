@@ -51,22 +51,23 @@ jobs:
           set -euo pipefail
           BUILD_GRADLE="$PROJECT_DIR/app/build.gradle.kts"
           if [ -f "$BUILD_GRADLE" ]; then
-            echo "Injecting buildConfig = true via Python..."
-            python3 -c "
-            path = r'$BUILD_GRADLE'
-            with open(path, 'r', encoding='utf-8') as f:
-                content = f.read()
-            if 'buildConfig' not in content:
-                if 'android {' in content:
-                    content = content.replace('android {', 'android {\n    buildFeatures {\n        buildConfig = true\n    }')
-                    with open(path, 'w', encoding='utf-8') as f:
-                        f.write(content)
-                    print('Successfully injected buildConfig = true')
-                else:
-                    print('WARNING: android block not found')
-            else:
-                print('buildConfig already present')
-            "
+            echo "Injecting buildConfig = true..."
+            python3 - "$BUILD_GRADLE" << 'EOF'
+          import sys
+          path = sys.argv[1]
+          with open(path, 'r', encoding='utf-8') as f:
+              content = f.read()
+          if 'buildConfig' not in content:
+              if 'android {' in content:
+                  content = content.replace('android {', 'android {\n    buildFeatures {\n        buildConfig = true\n    }')
+                  with open(path, 'w', encoding='utf-8') as f:
+                      f.write(content)
+                  print('Successfully injected buildConfig = true')
+              else:
+                  print('WARNING: android block not found')
+          else:
+              print('buildConfig already present')
+          EOF
           fi
 
       - name: Set up JDK 17
