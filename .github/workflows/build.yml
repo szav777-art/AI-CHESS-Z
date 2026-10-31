@@ -1,14 +1,12 @@
 
-name: Build AI-CHESS-Z 1.4.2 Engine Identity APK
+name: Build AI-CHESS-Z 1.4.3 Adaptive Combat APK
 
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
-      - master
+    branches: [main, master]
     paths:
-      - "AI_CHESS_Z_Android_1_4_2_ENGINE_IDENTITY.zip"
+      - "AI_CHESS_Z_Android_*.zip"
       - ".github/workflows/build.yml"
 
 permissions:
@@ -16,147 +14,84 @@ permissions:
 
 jobs:
   build:
-    name: Build Android APK
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 35
+
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+      GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx4g -Dorg.gradle.parallel=false
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Find and extract Android project
+      - name: Locate and extract project ZIP
         shell: bash
         run: |
           set -euo pipefail
 
-          ZIP_FILE="AI_CHESS_Z_Android_1_4_2_ENGINE_IDENTITY.zip"
+          ZIP="$(find . -maxdepth 1 -type f \
+            -name 'AI_CHESS_Z_Android_*.zip' -print -quit)"
 
-          if [ ! -f "$ZIP_FILE" ]; then
-            echo "ERROR: Project ZIP not found: $ZIP_FILE"
-            echo "Files in repository root:"
-            ls -la
+          test -n "$ZIP" || {
+            echo "ERROR: project ZIP missing in repository root"
             exit 1
-          fi
+          }
 
-          echo "Found project archive: $ZIP_FILE"
+          mkdir -p android-project
+          unzip -q "$ZIP" -d android-project
 
-          mkdir -p extracted_project
-          unzip -q "$ZIP_FILE" -d extracted_project
+          SETTINGS="$(find android-project -type f \
+            \( -name settings.gradle.kts \
+            -o -name settings.gradle \) -print -quit)"
 
-          PROJECT_DIR="extracted_project/AI_CHESS_Z_Android"
-
-          if [ ! -d "$PROJECT_DIR" ]; then
-            echo "ERROR: Expected project directory not found."
-            echo "Extracted archive structure:"
-            find extracted_project -maxdepth 4 -type f
+          test -n "$SETTINGS" || {
+            echo "ERROR: Gradle settings file missing"
             exit 1
-          fi
+          }
 
-          if [ ! -f "$PROJECT_DIR/gradlew" ]; then
-            echo "ERROR: Gradle wrapper gradlew not found."
-            find "$PROJECT_DIR" -maxdepth 3 -type f
-            exit 1
-          fi
+          echo "PROJECT_DIR=$(dirname "$SETTINGS")" >> "$GITHUB_ENV"
 
-          if [ ! -f "$PROJECT_DIR/settings.gradle" ] && \
-             [ ! -f "$PROJECT_DIR/settings.gradle.kts" ]; then
-            echo "ERROR: settings.gradle(.kts) not found."
-            exit 1
-          fi
-
-          chmod +x "$PROJECT_DIR/gradlew"
-
-          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-
-      - name: Set up Java 17
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
-          cache: gradle
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+          cache-disabled: true
 
-      - name: Accept Android SDK licenses
-        shell: bash
+      - name: Set up Android SDK and accept licenses
+        uses: android-actions/setup-android@v4
+        with:
+          accept-android-sdk-licenses: "true"
+          log-accepted-android-sdk-licenses: "false"
+          packages: "platform-tools platforms;android-35 build-tools;35.0.0"
+
+      - name: Verify Android SDK
         run: |
           set -euo pipefail
 
-          SDKMANAGER="$(command -v sdkmanager || true)"
+          test -d "$ANDROID_SDK_ROOT/platforms/android-35"
+          test -d "$ANDROID_SDK_ROOT/build-tools/35.0.0"
 
-          if [ -z "$SDKMANAGER" ]; then
-            SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-          fi
-
-          if [ ! -f "$SDKMANAGER" ]; then
-            echo "ERROR: sdkmanager not found."
-            echo "ANDROID_HOME=$ANDROID_HOME"
-            exit 1
-          fi
-
-          echo "Using sdkmanager: $SDKMANAGER"
-
-          yes | "$SDKMANAGER" --licenses || true
-
-      - name: Install Android SDK components
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          SDKMANAGER="$(command -v sdkmanager || true)"
-
-          if [ -z "$SDKMANAGER" ]; then
-            SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-          fi
-
-          "$SDKMANAGER" \
-            "platforms;android-35" \
-            "build-tools;35.0.0"
-
-      - name: Build APK
+      - name: Build debug APK
         shell: bash
         run: |
           set -euo pipefail
 
           cd "$PROJECT_DIR"
-
-          echo "Building AI-CHESS-Z 1.4.2"
-          echo "Java version:"
-          java -version
-
-          echo "Gradle version:"
-          ./gradlew --version
-
-          ./gradlew --no-daemon assembleDebug
-
-      - name: Verify APK
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          APK_DIR="$PROJECT_DIR/app/build/outputs/apk/debug"
-
-          if [ ! -d "$APK_DIR" ]; then
-            echo "ERROR: APK output directory not found."
-            exit 1
-          fi
-
-          APK_FILE="$(find "$APK_DIR" -maxdepth 1 -name '*.apk' -type f | head -n 1)"
-
-          if [ -z "$APK_FILE" ]; then
-            echo "ERROR: APK was not generated."
-            exit 1
-          fi
-
-          echo "APK successfully generated:"
-          ls -lh "$APK_FILE"
+          gradle --no-daemon --stacktrace assembleDebug
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AI-CHESS-Z-1.4.2-Engine-Identity-APK
-          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk
+          name: AI-CHESS-Z-1.4.3-Adaptive-Combat-APK
+          path: "${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk"
           if-no-files-found: error
           retention-days: 14
           
