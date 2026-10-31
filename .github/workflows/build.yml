@@ -1,21 +1,19 @@
-
-name: Build AI-CHESS-Z 1.3.2 APK
+name: Build AI-CHESS-Z 1.3.3 APK
 
 on:
   workflow_dispatch:
   push:
     paths:
-      - "AI_CHESS_Z_Android_1_3_2_LOG_REVIEW.zip"
+      - "AI_CHESS_Z_Android_1_3_3_UCI_STABILITY.zip"
       - ".github/workflows/build.yml"
 
 permissions:
   contents: read
 
+
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -24,21 +22,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ZIP="AI_CHESS_Z_Android_1_3_2_LOG_REVIEW.zip"
+          ZIP="AI_CHESS_Z_Android_1_3_3_UCI_STABILITY.zip"
           test -f "$ZIP"
           mkdir -p android-project
           unzip -q "$ZIP" -d android-project
-
-          SETTINGS="$(find android-project -type f \
-            \( -name settings.gradle.kts \
-            -o -name settings.gradle \) -print -quit)"
-
+          SETTINGS="$(find android-project -type f \( -name settings.gradle.kts -o -name settings.gradle \) -print -quit)"
           test -n "$SETTINGS"
           PROJECT_DIR="$(dirname "$SETTINGS")"
-
-          test -f "$PROJECT_DIR/app/build.gradle.kts" \
-            -o -f "$PROJECT_DIR/app/build.gradle"
-
+          test -f "$PROJECT_DIR/app/build.gradle.kts" -o -f "$PROJECT_DIR/app/build.gradle"
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
       - name: Set up JDK 17
@@ -50,7 +41,13 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
+          accept-android-sdk-licenses: "true"
           packages: "platform-tools platforms;android-35 build-tools;35.0.0"
+
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
 
       - name: Build debug APK
         shell: bash
@@ -59,11 +56,10 @@ jobs:
           cd "$PROJECT_DIR"
           gradle --no-daemon assembleDebug
 
-      - name: Upload APK artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AI-CHESS-Z-1.3.2-debug-APK
+          name: AI-CHESS-Z-1.3.3-debug-APK
           path: "${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk"
           if-no-files-found: error
           retention-days: 14
-          
