@@ -1,4 +1,4 @@
-name: Build AI-CHESS-Z 1.4.3 Adaptive Combat FIX1 APK
+name: Build AI-CHESS-Z 1.4.3 Adaptive Combat REBUILT APK
 
 on:
   workflow_dispatch:
@@ -15,25 +15,27 @@ permissions:
 
 jobs:
   build:
-    name: AI-CHESS-Z Android APK FIX1
+    name: AI-CHESS-Z Android APK Build
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout AI-CHESS-Z
         uses: actions/checkout@v4
 
-      - name: Verify project archive
+      - name: Verify and Find project archive
         shell: bash
         run: |
-          ZIP="AI_CHESS_Z_Android_1_4_3_ADAPTIVE_COMBAT_FIX1.zip"
+          # Автоматически находим любой .zip файл в корне
+          ZIP=$(ls -t *.zip 2>/dev/null | head -n 1)
 
-          if [ ! -f "$ZIP" ]; then
-            echo "::error::Required archive not found: $ZIP"
+          if [ -z "$ZIP" ]; then
+            echo "::error::No .zip archive found in repository root!"
             ls -lah
             exit 1
           fi
 
-          echo "Archive verified: $ZIP"
+          echo "ZIP_FILE=$ZIP" >> "$GITHUB_ENV"
+          echo "Archive found and selected: $ZIP"
           sha256sum "$ZIP"
 
       - name: Extract Android project
@@ -41,9 +43,7 @@ jobs:
         run: |
           mkdir -p android-project
 
-          unzip -q \
-            "AI_CHESS_Z_Android_1_4_3_ADAPTIVE_COMBAT_FIX1.zip" \
-            -d android-project
+          unzip -q "$ZIP_FILE" -d android-project
 
           # Находим директорию, где находится файл gradlew или build.gradle / build.gradle.kts
           PROJECT_DIR=$(find android-project -type f \( -name "gradlew" -o -name "build.gradle" -o -name "build.gradle.kts" \) -printf '%h\n' | head -n 1)
@@ -131,7 +131,7 @@ jobs:
       - name: Upload AI-CHESS-Z APK
         uses: actions/upload-artifact@v4
         with:
-          name: AI-CHESS-Z-1.4.3-Adaptive-Combat-FIX1-APK
+          name: AI-CHESS-Z-1.4.3-Adaptive-Combat-REBUILT-APK
           path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 30
