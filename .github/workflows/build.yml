@@ -45,6 +45,18 @@ jobs:
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
           echo "Project directory: $PROJECT_DIR"
 
+      - name: Enable BuildConfig in Gradle
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUILD_GRADLE="$PROJECT_DIR/app/build.gradle.kts"
+          if [ -f "$BUILD_GRADLE" ]; then
+            if ! grep -q "buildConfig" "$BUILD_GRADLE"; then
+              echo "Injecting buildConfig = true into $BUILD_GRADLE"
+              sed -i '/android {/a \    buildFeatures {\n        buildConfig = true\n    }' "$BUILD_GRADLE"
+            fi
+          fi
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
