@@ -1,3 +1,4 @@
+
 name: Build AI-CHESS-Z 1.3.5 APK
 
 on:
@@ -5,7 +6,7 @@ on:
   push:
     branches: [ main, master ]
     paths:
-      - 'AI_CHESS_Z_Android_*.zip'
+      - '**AI_CHESS_Z_Android_*.zip'
       - '.github/workflows/build.yml'
 
 permissions:
@@ -15,6 +16,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -23,20 +25,34 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
           ZIP="$(find . -maxdepth 1 -type f -name 'AI_CHESS_Z_Android_*.zip' -print -quit)"
+
           if [ -z "$ZIP" ]; then
-            echo "ERROR: Upload AI_CHESS_Z_Android_*.zip to repository root first."
+            echo "ERROR: Android project ZIP not found in repository root."
             exit 1
           fi
+
+          echo "Found archive: $ZIP"
+
           mkdir -p android-project
           unzip -q "$ZIP" -d android-project
-          SETTINGS="$(find android-project -type f \\ \( -name settings.gradle.kts -o -name settings.gradle \) -print -quit)"
+
+          SETTINGS="$(find android-project -type f -name settings.gradle.kts -print -quit)"
+
+          if [ -z "$SETTINGS" ]; then
+            SETTINGS="$(find android-project -type f -name settings.gradle -print -quit)"
+          fi
+
           if [ -z "$SETTINGS" ]; then
             echo "ERROR: Gradle settings file not found inside ZIP."
             exit 1
           fi
+
           PROJECT_DIR="$(dirname "$SETTINGS")"
+
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+
           echo "Android project: $PROJECT_DIR"
 
       - name: Set up JDK 17
@@ -48,18 +64,26 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Android SDK packages and accept licenses
+      - name: Install Android SDK packages
         shell: bash
         run: |
           set -euo pipefail
-          SDKMANAGER="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}/cmdline-tools/latest/bin/sdkmanager"
+
+          SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+
+          SDKMANAGER="$SDK/cmdline-tools/latest/bin/sdkmanager"
+
           if [ ! -x "$SDKMANAGER" ]; then
-            echo "ERROR: sdkmanager not found at $SDKMANAGER"
-            find "${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}/cmdline-tools" -maxdepth 3 -type f -name sdkmanager || true
+            echo "ERROR: sdkmanager not found: $SDKMANAGER"
             exit 1
           fi
-          yes | "$SDKMANAGER" --licenses >/dev/null || true
-          "$SDKMANAGER" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+          yes | "$SDKMANAGER" --licenses || true
+
+          "$SDKMANAGER" \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.0"
 
       - name: Set up Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
@@ -70,7 +94,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
           cd "$PROJECT_DIR"
+
           gradle --no-daemon --stacktrace :app:assembleDebug
 
       - name: Upload APK artifact
@@ -80,3 +106,4 @@ jobs:
           path: '${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk'
           if-no-files-found: error
           retention-days: 14
+          
