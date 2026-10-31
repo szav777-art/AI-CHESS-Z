@@ -1,15 +1,11 @@
-
 name: Build AI-CHESS-Z 1.3.5 APK
 
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
-      - master
     paths:
-      - '**AI_CHESS_Z_Android_*.zip'
-      - '.github/workflows/build.yml'
+      - "AI_CHESS_Z_Android_*.zip"
+      - ".github/workflows/build.yml"
 
 permissions:
   contents: read
@@ -17,82 +13,95 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Locate and extract Android project ZIP
+      - name: Extract Android project
         shell: bash
         run: |
           set -euo pipefail
-
-          ZIP="$(find . -maxdepth 1 -type f -name 'AI_CHESS_Z_Android_*.zip' -print -quit)"
-
-          if [ -z "$ZIP" ]; then
-            echo "ERROR: Android project ZIP not found in repository root."
+          ZIP=$(ls AI_CHESS_Z_Android_*.zip 2>/dev/null | head -n 1)
+          test -n "$ZIP" || {
+            echo "ERROR: missing AI_CHESS_Z_Android_*.zip in repository root"
             exit 1
-          fi
-
-          echo "Found archive: $ZIP"
-
+          }
+          echo "Found ZIP archive: $ZIP"
           mkdir -p android-project
           unzip -q "$ZIP" -d android-project
 
-          SETTINGS="$(find android-project -type f \( -name settings.gradle.kts -o -name settings.gradle \) -print -quit)"
+          SETTINGS="$(find android-project -type f \
+            \( -name settings.gradle.kts -o -name settings.gradle \) \
+            -print -quit)"
 
-          if [ -z "$SETTINGS" ]; then
-            echo "ERROR: Gradle settings file not found inside ZIP."
+          test -n "$SETTINGS" || {
+            echo "ERROR: Gradle settings file not found"
             exit 1
-          fi
+          }
 
           PROJECT_DIR="$(dirname "$SETTINGS")"
-
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-          echo "Android project: $PROJECT_DIR"
+          echo "Project directory: $PROJECT_DIR"
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - name: Set up Android SDK and accept licenses
-        uses: android-actions/setup-android@v4
-        with:
-          accept-android-sdk-licenses: 'true'
-          log-accepted-android-sdk-licenses: 'false'
-          packages: 'platform-tools'
-
-      - name: Install required Android platform and build tools
+      - name: Enable BuildConfig in Gradle
         shell: bash
         run: |
           set -euo pipefail
+          BUILD_GRADLE="$PROJECT_DIR/app/build.gradle.kts"
+          if [ -f "$BUILD_GRADLE" ]; then
+            echo "Injecting buildConfig = true via Python..."
+            python3 -c "
+            path = r'$BUILD_GRADLE'
+            with open(path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            if 'buildConfig' not in content:
+                if 'android {' in content:
+                    content = content.replace('android {', 'android {\n    buildFeatures {\n        buildConfig = true\n    }')
+                    with open(path, 'w', encoding='utf-8') as f:
+                        f.write(content)
+                    print('Successfully injected buildConfig = true')
+                else:
+                    print('WARNING: android block not found')
+            else:
+                print('buildConfig already present')
+            "
+          fi
 
-          sdkmanager --sdk_root="$ANDROID_SDK_ROOT" \
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Configure Android SDK & Accept Licenses
+        shell: bash
+        run: |
+          echo "ANDROID_HOME=/usr/local/lib/android/sdk" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=/usr/local/lib/android/sdk" >> $GITHUB_ENV
+          
+          export ANDROID_HOME=/usr/local/lib/android/sdk
+          export ANDROID_SDK_ROOT=$ANDROID_HOME
+          
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            "platform-tools" \
             "platforms;android-35" \
             "build-tools;35.0.0"
 
-      - name: Set up Gradle 8.9
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.9'
-
-      - name: Build debug APK
+      - name: Build APK
         shell: bash
         run: |
           set -euo pipefail
-
           cd "$PROJECT_DIR"
+          gradle --no-daemon assembleDebug
 
-          gradle --no-daemon --stacktrace :app:assembleDebug
-
-      - name: Upload APK artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: AI-CHESS-Z-1.3.5-debug-APK
-          path: '${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk'
+          path: "${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk"
           if-no-files-found: error
           retention-days: 14
           
