@@ -20,22 +20,21 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout AI-CHESS-Z repository
+      - name: Checkout AI-CHESS-Z
         uses: actions/checkout@v4
 
-      - name: Verify exact project archive
+      - name: Verify project archive
         shell: bash
         run: |
           ZIP="AI_CHESS_Z_Android_1_4_3_ADAPTIVE_COMBAT_FIX1.zip"
 
           if [ ! -f "$ZIP" ]; then
             echo "::error::Required archive not found: $ZIP"
-            echo "Files in repository root:"
             ls -lah
             exit 1
           fi
 
-          echo "Verified archive: $ZIP"
+          echo "Archive verified: $ZIP"
           sha256sum "$ZIP"
 
       - name: Extract Android project
@@ -54,39 +53,34 @@ jobs:
             -printf '%h\n' | head -n 1)
 
           if [ -z "$PROJECT_DIR" ]; then
-            echo "::error::Gradle project not found inside archive."
+            echo "::error::Gradle project not found in archive."
             exit 1
           fi
 
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
           echo "Project directory: $PROJECT_DIR"
 
-      - name: Set up JDK 17
+      - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
 
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-
-      - name: Set up Android SDK
+      - name: Set up Android SDK and accept licenses
         uses: android-actions/setup-android@v3
+        with:
+          accept-android-sdk-licenses: true
+          packages: |
+            platform-tools
+            platforms;android-35
+            build-tools;35.0.0
 
-      - name: Install Android SDK 35
-        shell: bash
-        run: |
-          sdkmanager --install \
-            "platform-tools" \
-            "platforms;android-35" \
-            "build-tools;35.0.0"
-
-      - name: Verify Gradle project
+      - name: Verify Gradle wrapper
         shell: bash
         run: |
           cd "$PROJECT_DIR"
 
-          if [ ! -f "gradlew" ]; then
+          if [ ! -f gradlew ]; then
             echo "::error::Gradle wrapper not found."
             exit 1
           fi
@@ -95,7 +89,7 @@ jobs:
           java -version
           ./gradlew --version
 
-      - name: Compile AI-CHESS-Z APK
+      - name: Build AI-CHESS-Z APK
         shell: bash
         run: |
           cd "$PROJECT_DIR"
@@ -124,7 +118,7 @@ jobs:
           echo "APK successfully generated:"
           ls -lh "$APK"
 
-      - name: Upload AI-CHESS-Z APK artifact
+      - name: Upload AI-CHESS-Z APK
         uses: actions/upload-artifact@v4
         with:
           name: AI-CHESS-Z-1.4.3-Adaptive-Combat-FIX1-APK
