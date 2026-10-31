@@ -45,22 +45,19 @@ jobs:
             "AI_CHESS_Z_Android_1_4_3_ADAPTIVE_COMBAT_FIX1.zip" \
             -d android-project
 
-          PROJECT_DIR=$(find android-project \
-            -type f \
-            \( -name "settings.gradle" \
-            -o -name "settings.gradle.kts" \) \
-            -printf '%h\n' | head -n 1)
+          # Находим директорию, где находится файл gradlew или build.gradle / build.gradle.kts
+          PROJECT_DIR=$(find android-project -type f \( -name "gradlew" -o -name "build.gradle" -o -name "build.gradle.kts" \) -printf '%h\n' | head -n 1)
 
           if [ -z "$PROJECT_DIR" ]; then
-            echo "::error::Gradle project not found in archive."
+            echo "::error::Android project root not found in archive."
             exit 1
           fi
 
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-          echo "Project directory: $PROJECT_DIR"
+          echo "Project directory identified: $PROJECT_DIR"
 
       - name: Set up Java 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
@@ -74,7 +71,6 @@ jobs:
           export ANDROID_HOME=/usr/local/lib/android/sdk
           export ANDROID_SDK_ROOT=$ANDROID_HOME
           
-          # Автоматически находим sdkmanager и принимаем все лицензии через yes
           SDKMGR=$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f | head -n 1)
           
           if [ -n "$SDKMGR" ]; then
@@ -89,14 +85,14 @@ jobs:
             exit 1
           fi
 
-      - name: Verify Gradle wrapper
+      - name: Prepare Gradle wrapper if missing
         shell: bash
         run: |
           cd "$PROJECT_DIR"
 
           if [ ! -f gradlew ]; then
-            echo "::error::Gradle wrapper not found."
-            exit 1
+            echo "gradlew not found in archive. Generating Gradle wrapper..."
+            gradle wrapper
           fi
 
           chmod +x gradlew
@@ -120,7 +116,7 @@ jobs:
           APK_DIR="$PROJECT_DIR/app/build/outputs/apk/debug"
 
           APK=$(find "$APK_DIR" \
-            -maxdepth 1 \
+            -maxdepth 2 \
             -type f \
             -name "*.apk" | head -n 1)
 
