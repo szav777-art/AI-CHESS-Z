@@ -1,11 +1,12 @@
-name: Build AI-CHESS-Z APK (1.4.0 preparation)
+
+name: Build AI-CHESS-Z 1.4.1 APK
 
 on:
   workflow_dispatch:
   push:
     branches: [main, master]
     paths:
-      - "AI_CHESS_Z_Android_*.zip"
+      - "AI_CHESS_Z_Android_1_4_1_ANALYSIS_SYNC.zip"
       - ".github/workflows/build.yml"
 
 permissions:
@@ -15,77 +16,111 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Locate and extract project ZIP
+      - name: Locate and extract Android project ZIP
         shell: bash
         run: |
           set -euo pipefail
-          mapfile -t ZIPS < <(find . -type f -name 'AI_CHESS_Z_Android_*.zip' -not -path './.git/*' | sort)
-          if [ "${#ZIPS[@]}" -eq 0 ]; then
-            echo "ERROR: project archive AI_CHESS_Z_Android_*.zip was not found. Commit the ZIP to the repository (root recommended)."
-            echo "Tracked ZIP files:" 
-            git ls-files '*.zip' || true
+          ZIP="AI_CHESS_Z_Android_1_4_1_ANALYSIS_SYNC.zip"
+          if [ ! -f "$ZIP" ]; then
+            echo "ERROR: $ZIP is missing from repository root."
+            echo "Upload/commit the project ZIP to repository root."
+            echo "ZIP files found:"
+            find . -type f -name '*.zip' \
+              -not -path './.git/*' -print || true
             exit 1
           fi
-          if [ "${#ZIPS[@]}" -gt 1 ]; then
-            echo "Found multiple archives; using newest by filename:"
-            printf '%s\n' "${ZIPS[@]}"
-          fi
-          ZIP="${ZIPS[-1]}"
-          echo "Selected archive: $ZIP"
+
           mkdir -p android-project
           unzip -q "$ZIP" -d android-project
-          SETTINGS="$(find android-project -type f \( -name settings.gradle.kts -o -name settings.gradle \) -print -quit)"
-          test -n "$SETTINGS" || { echo 'ERROR: Gradle settings file not found in archive'; exit 1; }
+
+          SETTINGS="$(find android-project -type f \
+            \( -name settings.gradle.kts \
+            -o -name settings.gradle \) \
+            -print -quit)"
+
+          test -n "$SETTINGS" || {
+            echo "ERROR: Gradle settings file not found"
+            exit 1
+          }
+
           PROJECT_DIR="$(dirname "$SETTINGS")"
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
           echo "Project directory: $PROJECT_DIR"
 
-      - name: Ensure BuildConfig enabled
+      - name: Enable BuildConfig
         shell: bash
         run: |
           set -euo pipefail
           BUILD_GRADLE="$PROJECT_DIR/app/build.gradle.kts"
-          test -f "$BUILD_GRADLE" || { echo "ERROR: $BUILD_GRADLE not found"; exit 1; }
+
+          if [ ! -f "$BUILD_GRADLE" ]; then
+            echo "ERROR: app/build.gradle.kts not found"
+            exit 1
+          fi
+
           python3 - "$BUILD_GRADLE" <<'PY'
           import pathlib, re, sys
+
           p = pathlib.Path(sys.argv[1])
           s = p.read_text(encoding='utf-8')
-          if re.search(r'buildFeatures\s*\{[^}]*buildConfig\s*=\s*true', s, re.S):
-              print('buildConfig already enabled')
-          elif re.search(r'buildFeatures\s*\{', s):
-              s = re.sub(r'(buildFeatures\s*\{)', r'\1\n buildConfig = true', s, count=1)
-              p.write_text(s, encoding='utf-8')
-              print('Enabled buildConfig in existing buildFeatures block')
+
+          if re.search(
+              r'buildFeatures\s*\{[^}]*buildConfig\s*=\s*true',
+              s, re.S
+          ):
+              print('BuildConfig already enabled')
           elif re.search(r'android\s*\{', s):
-              s = re.sub(r'(android\s*\{)', r'\1\n buildFeatures {\n buildConfig = true\n }', s, count=1)
+              s = re.sub(
+                  r'(android\s*\{)',
+                  r'\1\n    buildFeatures {\n'
+                  r'        buildConfig = true\n    }',
+                  s, count=1
+              )
               p.write_text(s, encoding='utf-8')
-              print('Added buildFeatures { buildConfig = true }')
+              print('Enabled buildFeatures.buildConfig')
           else:
-              raise SystemExit('ERROR: android block not found')
+              raise SystemExit(
+                  'ERROR: android { block not found'
+              )
           PY
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: "17"
 
       - name: Configure Android SDK and accept licenses
         shell: bash
         run: |
           set -euo pipefail
-          echo 'ANDROID_HOME=/usr/local/lib/android/sdk' >> "$GITHUB_ENV"
-          echo 'ANDROID_SDK_ROOT=/usr/local/lib/android/sdk' >> "$GITHUB_ENV"
+
+          echo "ANDROID_HOME=/usr/local/lib/android/sdk" \
+            >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=/usr/local/lib/android/sdk" \
+            >> "$GITHUB_ENV"
+
           export ANDROID_HOME=/usr/local/lib/android/sdk
           export ANDROID_SDK_ROOT="$ANDROID_HOME"
+
           SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-          test -x "$SDKMANAGER" || { echo "ERROR: sdkmanager not found at $SDKMANAGER"; find "$ANDROID_HOME/cmdline-tools" -maxdepth 3 -type f -name sdkmanager || true; exit 1; }
+
+          test -x "$SDKMANAGER" || {
+            echo "ERROR: sdkmanager not found"
+            exit 1
+          }
+
           yes | "$SDKMANAGER" --licenses || true
-          "$SDKMANAGER" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+          "$SDKMANAGER" \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.0"
 
       - name: Build debug APK
         shell: bash
@@ -97,7 +132,8 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AI-CHESS-Z-debug-APK
+          name: AI-CHESS-Z-1.4.1-debug-APK
           path: "${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk"
           if-no-files-found: error
           retention-days: 14
+          
