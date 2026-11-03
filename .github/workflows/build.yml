@@ -1,15 +1,16 @@
-name: Build AI-CHESS-Z 1.4.8 Engine Import Restore
+name: Build AI-CHESS-Z 1.5.0 Analysis AutoPlay Sync
 
 on:
   workflow_dispatch:
   push:
     branches: [main, master]
     paths:
-      - "AI_CHESS_Z_Android_1_4_8_ENGINE_IMPORT_RESTORE.zip"
+      - "AI_CHESS_Z_Android_1_5_0_ANALYSIS_AUTOPLAY_SYNC.zip"
       - ".github/workflows/build.yml"
 
 permissions:
   contents: read
+
 
 jobs:
   build:
@@ -23,7 +24,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ZIP="AI_CHESS_Z_Android_1_4_8_ENGINE_IMPORT_RESTORE.zip"
+          ZIP="AI_CHESS_Z_Android_1_5_0_ANALYSIS_AUTOPLAY_SYNC.zip"
           test -f "$ZIP" || { echo "ERROR: missing $ZIP in repository root"; exit 1; }
           sha256sum "$ZIP"
           unzip -t "$ZIP"
@@ -33,7 +34,7 @@ jobs:
           test -n "$SETTINGS" || { echo "ERROR: Gradle settings file not found"; exit 1; }
           PROJECT_DIR="$(dirname "$SETTINGS")"
           test -f "$PROJECT_DIR/app/build.gradle.kts" || { echo "ERROR: app/build.gradle.kts not found"; exit 1; }
-          grep -q 'versionName = "1.4.8-engine-import-restore"' "$PROJECT_DIR/app/build.gradle.kts"
+          grep -q 'versionName = "1.5.0-analysis-autoplay-sync"' "$PROJECT_DIR/app/build.gradle.kts"
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
           echo "Project directory: $PROJECT_DIR"
 
@@ -85,7 +86,7 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AI-CHESS-Z-1.4.8-engine-import-restore-debug-APK
+          name: AI-CHESS-Z-1.5.0-analysis-autoplay-sync-debug-APK
           path: "${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk"
           if-no-files-found: error
           retention-days: 30
